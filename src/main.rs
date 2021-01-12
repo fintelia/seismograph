@@ -5,24 +5,20 @@ use std::{
     io::BufWriter,
     path::PathBuf,
     sync::atomic::{AtomicBool, Ordering},
-    time::Instant,
 };
 use structopt::StructOpt;
+use crate::run::Datapoint;
+
+mod run;
+mod sample;
 
 const MAX_DATAPOINTS: usize = 10_000_000;
-
 static EXIT: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, StructOpt)]
 struct Opt {
     #[structopt(short, long, default_value = "trace.json")]
     output: PathBuf,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-struct Datapoint {
-    elapsed_seconds: f32,
-    cpu_frequency: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -32,11 +28,6 @@ struct TraceFile {
     cmdline: String,
     cpuinfo: String,
     data: Vec<Datapoint>,
-}
-
-fn get_cpu_frequency() -> u32 {
-    let freq = fs::read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").unwrap();
-    freq.trim().parse().unwrap()
 }
 
 fn main() {
@@ -68,27 +59,12 @@ fn main() {
     };
 
     while trace.data.len() < MAX_DATAPOINTS && !EXIT.load(Ordering::SeqCst) {
-        let start = Instant::now();
-        for _ in 0..10000 {
-            unsafe { libc::syscall(libc::SYS_getpid) };
-        }
-
-        let elapsed_seconds = start.elapsed().as_secs_f32();
-        let cpu_frequency = get_cpu_frequency(); 
-
-        trace.data.push(Datapoint {
-            elapsed_seconds,
-            cpu_frequency,
-        });
+        trace.data.push(run::single_iter());
         progress.set_position(trace.data.len() as u64);
         progress.set_length(progress.position() * 10000 / (1 + progress.position() % 10000));
     }
     progress.finish_at_current_pos();
 
-    let t = Instant::now();
-
     let writer = BufWriter::new(File::create(opt.output).unwrap());
     serde_json::to_writer_pretty(writer, &trace).unwrap();
-
-    println!("{} ns/datapoint", t.elapsed().as_nanos() as f64 / trace.data.len() as f64);
 }
