@@ -1,7 +1,9 @@
 use crate::run::Datapoint;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
+use plotters::prelude::*;
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -15,13 +17,15 @@ use walkdir::WalkDir;
 mod run;
 mod sample;
 
+include!(concat!(env!("OUT_DIR"), "/source_hashes.rs"));
+
 const MAX_DATAPOINTS: usize = 10_000_000;
 static EXIT: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, StructOpt)]
 struct Opt {
     #[structopt(short, long, default_value = "trace.json")]
-    output: PathBuf,
+    output_suffix: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -48,15 +52,6 @@ fn main() {
     })
     .unwrap();
 
-    let opt = Opt::from_args();
-
-    let progress = ProgressBar::new(MAX_DATAPOINTS as u64);
-    progress.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}")
-            .progress_chars("##-"),
-    );
-
     let mut trace = TraceFile {
         hostname: fs::read_to_string("/proc/sys/kernel/hostname").unwrap(),
         kernel: fs::read_to_string("/proc/version").unwrap(),
@@ -79,12 +74,40 @@ fn main() {
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file())
     {
-        trace.source_code.insert(
-            entry.path().to_owned(),
-            fs::read_to_string(entry.path()).unwrap(),
-        );
+        let source = fs::read(entry.path()).unwrap();
+        let hash = hex::encode(sha2::Sha256::digest(&source).as_slice());
+        let source_matches = SOURCE_HASHES
+            .get(&*entry.path().to_string_lossy())
+            .map(|h| *h == &hash)
+            .unwrap_or(false);
+
+        if !source_matches {
+            eprintln!("ERROR: source file '{}' changed", entry.path().display());
+            return;
+        }
+
+        trace
+            .source_code
+            .insert(entry.into_path(), String::from_utf8_lossy(&source).into());
     }
 
+    let opt = Opt::from_args();
+    let trace_file_path = format!(
+        "trace/{}-{}",
+        trace
+            .experiment_start
+            .to_rfc3339_opts(SecondsFormat::Secs, true)
+            .replace(':', "."),
+        opt.output_suffix
+    );
+    println!("Recording '{}'...", trace_file_path);
+
+    let progress = ProgressBar::new(MAX_DATAPOINTS as u64);
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}")
+            .progress_chars("##-"),
+    );
     while trace.data.len() < MAX_DATAPOINTS && !EXIT.load(Ordering::SeqCst) {
         trace.data.push(run::single_iter());
         progress.set_position(trace.data.len() as u64);
@@ -93,6 +116,28 @@ fn main() {
     trace.experiment_end = Utc::now();
     progress.finish_at_current_pos();
 
-    let writer = BufWriter::new(File::create(opt.output).unwrap());
+    fs::create_dir_all("trace").unwrap();
+    let writer = BufWriter::new(File::create(trace_file_path).unwrap());
     serde_json::to_writer_pretty(writer, &trace).unwrap();
+
+    let root_area = BitMapBackend::new("plot.png", (600, 400)).into_drawing_area();
+    root_area.fill(&WHITE).unwrap();
+
+    let mut ctx = ChartBuilder::on(&root_area)
+        .set_label_area_size(LabelAreaPosition::Left, 40)
+        .set_label_area_size(LabelAreaPosition::Bottom, 40)
+        .caption("Scatter Demo", ("sans-serif", 40))
+        .build_cartesian_2d(0.0f32..1.0e-6, 0.0f32..1.0e7)
+        .unwrap();
+
+    ctx.configure_mesh().draw().unwrap();
+
+    // ctx.draw_series(trace.data.iter().map(|datapoint| {
+    //     Point::new(
+    //         (datapoint.average_time, datapoint.cpu_frequency as f32),
+    //         5,
+    //         &BLUE,
+    //     )
+    // }))
+    // .unwrap();
 }

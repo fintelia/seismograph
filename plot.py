@@ -4,33 +4,41 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors
 from matplotlib.ticker import PercentFormatter
-import csv
+import pathlib, json, glob, os
 
-cycles_all = []
-with open('bench.all.csv', newline='') as csvfile:
-    r = csv.reader(csvfile, delimiter=',')
-    for row in r:
-        cycles_all.append(float(row[1]))
+newest_trace = max(glob.glob('trace/*'), key=os.path.getctime);
+output_file = newest_trace.replace("trace/", "graphs/").replace(".json", ".png")
+print("Plotting '{}' -> '{}'".format(newest_trace, output_file))
 
-cycles_none = []
-cycles_none2 = []
-with open('out', newline='') as csvfile:
-    r = csv.reader(csvfile, delimiter=',')
-    for row in r:
-        cycles_none.append(float(row[1]))
-        cycles_none2.append(float(row[2]))
+times = []
+frequencies = []
+with open(newest_trace) as file:
+    data = json.load(file)
+    for p in data["data"]:
+        times.append((p["average_time"] * 1000000000.0))
+        frequencies.append(p["cpu_frequency"])
 
-n_bins = 50
+# fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
+# axs.hist2d(times, frequencies, bins=(100,30), range=((60, 100), (2000000, 5000000)), norm=colors.LogNorm())
+
+# axs.set_ylabel('frequency')
+# axs.set_xlabel('time (ns)')
+
+# pathlib.Path("graphs").mkdir(exist_ok=True)
+# plt.savefig(output_file)
+# plt.show()
+
+
+
+
+
+
 
 fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
-
-# We can set the number of bins with the `bins` kwarg
-#axs.hist(cycles_all, range=(410,470), bins=n_bins, label="mitigations=on")
-axs.hist2d(cycles_none, cycles_none2, bins=(70,60), range=((430, 500), (2000000, 5000000)), label="mitigations=off", norm=colors.LogNorm())
-
-axs.set_ylabel('frequency')
-axs.set_xlabel('cycles')
-axs.legend()
-
-plt.savefig("histogram.png")
+axs.scatter(range(len(times)), times, c=frequencies, s=0.0001, norm=colors.Normalize(2000000, 5000000, clip=True), label="times")
+# plt.xlim(0, 100);
+plt.ylim(min(times)-.1, np.percentile(times, 99.5));
+axs.set_ylabel('Average getpid time (ns)')
+axs.set_xlabel('Sample number')
 plt.show()
+
