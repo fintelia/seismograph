@@ -1,3 +1,5 @@
+#![feature(asm)]
+
 use crate::run::Datapoint;
 use chrono::{DateTime, SecondsFormat, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -19,7 +21,7 @@ mod sample;
 
 include!(concat!(env!("OUT_DIR"), "/source_hashes.rs"));
 
-const MAX_DATAPOINTS: usize = 10_000_000;
+const MAX_DATAPOINTS: usize = 500_000;
 static EXIT: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, StructOpt)]
@@ -101,6 +103,9 @@ fn main() {
         opt.output_suffix
     );
     println!("Recording '{}'...", trace_file_path);
+
+    let mask = 0x4u128;
+    unsafe { libc::sched_setaffinity(0, 16, &mask as *const u128 as *const _); }
 
     let progress = ProgressBar::new(MAX_DATAPOINTS as u64);
     progress.set_style(
