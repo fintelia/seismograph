@@ -21,7 +21,7 @@ mod sample;
 
 include!(concat!(env!("OUT_DIR"), "/source_hashes.rs"));
 
-const MAX_DATAPOINTS: usize = 500_000;
+const MAX_DATAPOINTS: usize = 5_000_000;
 static EXIT: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, StructOpt)]

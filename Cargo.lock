@@ -768,8 +768,6 @@ dependencies = [
 [[package]]
 name = "perfcnt"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5f89cc4b06e712f0adddb96c818526f0dec372b88376ae829171bc2059ac7ac"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -1207,6 +1205,7 @@ dependencies = [
  "sha2",
  "structopt",
  "walkdir",
+ "x86",
 ]
 
 [[package]]

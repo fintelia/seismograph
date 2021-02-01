@@ -38,3 +38,18 @@ pub(crate) fn stop_timer() -> u64 {
 
     ((cycles_high as u64) << 32) | cycles_low as u64
 }
+
+pub(crate) fn rdpmc(idx: u32) -> u64 {
+    let value_low: u32;
+    let value_high: u32;
+
+    unsafe {
+        asm!("rdpmc",
+            out("eax") value_low,
+            in("ecx") idx,
+            out("edx") value_high,
+        )
+    }
+
+    ((value_high as u64) << 32) | value_low as u64
+}
