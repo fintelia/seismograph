@@ -1,18 +1,12 @@
 #![feature(asm)]
+#![feature(test)]
 
 use crate::run::Datapoint;
 use chrono::{DateTime, SecondsFormat, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
-use plotters::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
-use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::BufWriter,
-    path::PathBuf,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::{collections::HashMap, fs::{self, File}, io::BufWriter, num::ParseIntError, path::PathBuf, sync::atomic::{AtomicBool, Ordering}};
 use structopt::StructOpt;
 use walkdir::WalkDir;
 
@@ -21,13 +15,29 @@ mod sample;
 
 include!(concat!(env!("OUT_DIR"), "/source_hashes.rs"));
 
-const MAX_DATAPOINTS: usize = 5_000_000;
+const MAX_DATAPOINTS: usize = 500_000;
 static EXIT: AtomicBool = AtomicBool::new(false);
+
+fn parse_hex(src: &str) -> Result<u8, ParseIntError> {
+    u8::from_str_radix(src, 16)
+}
 
 #[derive(Debug, StructOpt)]
 struct Opt {
     #[structopt(short, long, default_value = "trace.json")]
     output_suffix: String,
+    #[structopt(long, parse(try_from_str = parse_hex))]
+    event: u8,
+    #[structopt(long, parse(try_from_str = parse_hex))]
+    umask: u8,
+    #[structopt(long, default_value = "0")]
+    counter_mask: u8,
+    #[structopt(long)]
+    invert: bool,
+    #[structopt(long)]
+    edge_detect: bool,
+    #[structopt(long)]
+    anyt: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -102,7 +112,7 @@ fn main() {
             .replace(':', "."),
         opt.output_suffix
     );
-    println!("Recording '{}'...", trace_file_path);
+    eprintln!("Recording '{}'...", trace_file_path);
 
     let mask = 0x4u128;
     unsafe { libc::sched_setaffinity(0, 16, &mask as *const u128 as *const _); }
@@ -113,10 +123,12 @@ fn main() {
             .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}")
             .progress_chars("##-"),
     );
+    progress.set_draw_delta(1000);
+    let mut experiment = run::Experiment::new(&opt);
     while trace.data.len() < MAX_DATAPOINTS && !EXIT.load(Ordering::SeqCst) {
-        trace.data.push(run::single_iter());
+        trace.data.push(experiment.single_iter());
         progress.set_position(trace.data.len() as u64);
-        progress.set_length(progress.position() * 10000 / (1 + progress.position() % 10000));
+        progress.set_length(progress.position() * 100000 / (1 + progress.position() % 100000));
     }
     trace.experiment_end = Utc::now();
     progress.finish_at_current_pos();
@@ -124,25 +136,4 @@ fn main() {
     fs::create_dir_all("trace").unwrap();
     let writer = BufWriter::new(File::create(trace_file_path).unwrap());
     serde_json::to_writer_pretty(writer, &trace).unwrap();
-
-    let root_area = BitMapBackend::new("plot.png", (600, 400)).into_drawing_area();
-    root_area.fill(&WHITE).unwrap();
-
-    let mut ctx = ChartBuilder::on(&root_area)
-        .set_label_area_size(LabelAreaPosition::Left, 40)
-        .set_label_area_size(LabelAreaPosition::Bottom, 40)
-        .caption("Scatter Demo", ("sans-serif", 40))
-        .build_cartesian_2d(0.0f32..1.0e-6, 0.0f32..1.0e7)
-        .unwrap();
-
-    ctx.configure_mesh().draw().unwrap();
-
-    // ctx.draw_series(trace.data.iter().map(|datapoint| {
-    //     Point::new(
-    //         (datapoint.average_time, datapoint.cpu_frequency as f32),
-    //         5,
-    //         &BLUE,
-    //     )
-    // }))
-    // .unwrap();
 }
