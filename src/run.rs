@@ -8,8 +8,8 @@ use std::mem;
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Datapoint {
     pub average_cycles: u32,
+	pub uops_retired: u32,
 	pub counter: u32,
-	pub counter2: u32,
 }
 
 const ITERATIONS: usize = 1;
@@ -117,8 +117,8 @@ impl Experiment {
 
 		Datapoint {
 			average_cycles,
-			counter: counter_elapsed as u32,
-			counter2: counter2_elapsed as u32,
+			uops_retired: counter_elapsed as u32,
+			counter: counter2_elapsed as u32,
 		}
 	}
 }

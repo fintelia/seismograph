@@ -38,6 +38,8 @@ struct Opt {
     edge_detect: bool,
     #[structopt(long)]
     anyt: bool,
+    #[structopt(long)]
+    stdout: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -133,7 +135,13 @@ fn main() {
     trace.experiment_end = Utc::now();
     progress.finish_at_current_pos();
 
-    fs::create_dir_all("trace").unwrap();
-    let writer = BufWriter::new(File::create(trace_file_path).unwrap());
-    serde_json::to_writer_pretty(writer, &trace).unwrap();
+    if opt.stdout {
+        let stdout = std::io::stdout();
+        let handle = stdout.lock();
+        serde_json::to_writer_pretty(handle, &trace).unwrap();
+    } else {
+        fs::create_dir_all("trace").unwrap();
+        let writer = BufWriter::new(File::create(trace_file_path).unwrap());
+        serde_json::to_writer_pretty(writer, &trace).unwrap();
+    }
 }
