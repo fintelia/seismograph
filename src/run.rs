@@ -104,7 +104,7 @@ impl Experiment {
 		let counter2_start = sample::rdpmc(idx2);
 
 		for _ in 0..ITERATIONS {
-			unsafe { libc::syscall(libc::SYS_getpid) };
+			unsafe { libc::syscall(-1 /*libc::SYS_getpid*/) };
 			// std::hint::black_box(f64::sqrt(std::hint::black_box(12345.0)));
 		}
 

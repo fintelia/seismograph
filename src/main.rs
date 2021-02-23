@@ -22,7 +22,7 @@ fn parse_hex(src: &str) -> Result<u8, ParseIntError> {
     u8::from_str_radix(src, 16)
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt, Serialize, Deserialize)]
 struct Opt {
     #[structopt(short, long, default_value = "trace.json")]
     output_suffix: String,
@@ -44,6 +44,7 @@ struct Opt {
 
 #[derive(Serialize, Deserialize)]
 struct TraceFile {
+    options: Opt,
     hostname: String,
     kernel: String,
     cmdline: String,
@@ -66,7 +67,9 @@ fn main() {
     })
     .unwrap();
 
+    let opt = Opt::from_args();
     let mut trace = TraceFile {
+        options: opt.clone(),
         hostname: fs::read_to_string("/proc/sys/kernel/hostname").unwrap(),
         kernel: fs::read_to_string("/proc/version").unwrap(),
         cmdline: fs::read_to_string("/proc/cmdline").unwrap(),
@@ -105,7 +108,6 @@ fn main() {
             .insert(entry.into_path(), String::from_utf8_lossy(&source).into());
     }
 
-    let opt = Opt::from_args();
     let trace_file_path = format!(
         "trace/{}-{}",
         trace
@@ -116,7 +118,7 @@ fn main() {
     );
     eprintln!("Recording '{}'...", trace_file_path);
 
-    let mask = 0x4u128;
+    let mask = 0x0u128;
     unsafe { libc::sched_setaffinity(0, 16, &mask as *const u128 as *const _); }
 
     let progress = ProgressBar::new(MAX_DATAPOINTS as u64);
@@ -129,8 +131,11 @@ fn main() {
     let mut experiment = run::Experiment::new(&opt);
     while trace.data.len() < MAX_DATAPOINTS && !EXIT.load(Ordering::SeqCst) {
         trace.data.push(experiment.single_iter());
-        progress.set_position(trace.data.len() as u64);
-        progress.set_length(progress.position() * 100000 / (1 + progress.position() % 100000));
+
+        // if trace.data.len() % 10000 == 0 {
+        //     progress.set_position(trace.data.len() as u64);
+        //     progress.set_length(progress.position() * 1000000 / (1 + progress.position() % 1000000));
+        // }
     }
     trace.experiment_end = Utc::now();
     progress.finish_at_current_pos();
