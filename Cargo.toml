@@ -15,7 +15,7 @@ indicatif = "0.15.0"
 lazy_static = "1.4.0"
 libc = "0.2.82"
 mmap = "0.1.1"
-perfcnt = { path = "../rust-perfcnt" } #"0.6.0"
+perfcnt = { git = "https://github.com/fintelia/rust-perfcnt", rev = "669ff644e83d57bb1cfd2adcf9a983ada71c7e9e" } #"0.6.0"
 serde = { version = "1.0.119", features = ["derive"] }
 serde_json = "1.0.61"
 sha2 = "0.9.2"
