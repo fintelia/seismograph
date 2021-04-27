@@ -1,5 +1,5 @@
 use crate::sample;
-use perfcnt::linux::{PerfCounter, PerfCounterBuilderLinux, MMAPPage};
+use perfcnt::linux::{PerfCounter, PerfCounterBuilderLinux, MMAPPage, SamplingPerfCounter, Event, HardwareEventType};
 use perfcnt::AbstractPerfCounter;
 use serde::{Deserialize, Serialize};
 use x86::perfcnt::intel::{EventDescription, Tuple, Counter, MSRIndex, PebsType};
@@ -10,15 +10,27 @@ pub(crate) struct Datapoint {
     pub average_cycles: u32,
 	pub uops_retired: u32,
 	pub counter: u32,
+	// pub kernel_ip: u64,
+	// pub dt: i64,
 }
 
 const ITERATIONS: usize = 1;
+
+#[inline(never)]
+fn do_nop() {}
 
 pub(crate) struct Experiment {
 	_pc: PerfCounter,
 	mmap: mmap::MemoryMap,
 	_pc2: PerfCounter,
 	mmap2: mmap::MemoryMap,
+	// sampling_pc: SamplingPerfCounter,
+
+    // time_shift: u16,
+    // time_mult: u32,
+    // time_offset: u64,
+	// time_zero: u64,
+
 }
 impl Experiment {
 	pub fn new(opt: &super::Opt) -> Self {
@@ -59,36 +71,63 @@ impl Experiment {
 			pebs: PebsType::Regular,
 			taken_alone: false,
 		};
-		let mut builder = PerfCounterBuilderLinux::from_intel_event_description(&event_desc);
-		builder.pinned();
-		//builder.enable_read_format_time_enabled();
-		//builder.enable_read_format_time_running();
-		let pc: PerfCounter = builder.finish().unwrap();
-		let mmap = pc.mmap_header();
-		pc.start().unwrap();
 
-		let mut builder2 = PerfCounterBuilderLinux::from_intel_event_description(&EventDescription {
-			event_code: Tuple::One(opt.event), // 0x0e
-			umask: Tuple::One(opt.umask), // 0x01
-			counter_mask: opt.counter_mask, // 0
-			any_thread: opt.anyt,
-			edge_detect: opt.edge_detect,
-			invert: opt.invert,
-			..event_desc
-		});
-		builder2.pinned();
-		//builder.enable_read_format_time_enabled();
-		//builder.enable_read_format_time_running();
-		let pc2: PerfCounter = builder2.finish().unwrap();
-		let mmap2 = pc2.mmap_header();
-		pc2.start().unwrap();
+		let (pc, mmap) = {
+			let mut builder = PerfCounterBuilderLinux::from_intel_event_description(&event_desc);
+			builder.pinned();
+			let pc: PerfCounter = builder.finish().unwrap();
+			let mmap = pc.mmap_header();
+			pc.start().unwrap();
+			(pc, mmap)
+		};
 
+		let (pc2, mmap2) = {
+			let mut builder = PerfCounterBuilderLinux::from_intel_event_description(&EventDescription {
+				event_code: Tuple::One(opt.event), // 0x0e
+				umask: Tuple::One(opt.umask), // 0x01
+				counter_mask: opt.counter_mask, // 0
+				any_thread: opt.anyt,
+				edge_detect: opt.edge_detect,
+				invert: opt.invert,
+
+				msr_index: MSRIndex::None,
+				pebs: PebsType::Regular,
+				..event_desc
+			});
+			builder.pinned();
+			let pc: PerfCounter = builder.finish().unwrap();
+			let mmap = pc.mmap_header();
+			pc.start().unwrap();
+			(pc, mmap)
+		};
+
+		// let sampling_pc = {
+		// 	let mut builder = PerfCounterBuilderLinux::from_hardware_event(HardwareEventType::CPUCycles);
+ 		// 	builder.pinned();
+		// 	builder.enable_sampling_ip();
+		// 	// builder.enable_read_format_id();
+		// 	// builder.enable_read_format_time_enabled();
+		// 	// builder.enable_read_format_time_running();
+		// 	builder.enable_sampling_time();
+		// 	builder.enable_sampling_identifier();
+		// 	builder.enable_sampling_tid();
+		// 	builder.set_sample_period(10000);
+		// 	builder.exclude_user();
+		// 	SamplingPerfCounter::new(builder.finish().unwrap())
+		// };
+
+		// dbg!(sampling_pc.header().capabilities);
 
 		Self {
 			_pc: pc,
 			mmap,
 			_pc2: pc2,
 			mmap2,
+			// time_shift: dbg!(sampling_pc.header().time_shift),
+			// time_mult: dbg!(sampling_pc.header().time_mult),
+			// time_offset: dbg!(sampling_pc.header().time_offset),
+			// time_zero: dbg!(sampling_pc.header().time_zero),
+			// sampling_pc,
 		}
 	}
 
@@ -99,26 +138,58 @@ impl Experiment {
 		let pc_header2 = unsafe { mem::transmute::<*mut u8, &mut MMAPPage>(self.mmap2.data()) };
 		let idx2 = pc_header2.index - 1;
 
-		let start = sample::start_timer();
 		let counter_start = sample::rdpmc(idx);
 		let counter2_start = sample::rdpmc(idx2);
+		let start = sample::start_timer();
 
 		for _ in 0..ITERATIONS {
-			unsafe { libc::syscall(-1 /*libc::SYS_getpid*/) };
+			unsafe {
+				asm!("
+call __x86_indirect_thunk_r11;
+jmp 5f;
+__x86_indirect_thunk_r11:
+	call 4f;
+3:	pause;
+	lfence;
+	jmp 3b;
+.align 16
+4:	mov [rsp], r11;
+	ret;
+5:",
+				in("r11") do_nop);
+			}
+			// unsafe { libc::syscall(-1 /*libc::SYS_getpid*/) };
 			// std::hint::black_box(f64::sqrt(std::hint::black_box(12345.0)));
 		}
 
+		let end = sample::stop_timer();
 		let counter2_elapsed = sample::rdpmc(idx2) - counter2_start;
 		let counter_elapsed = sample::rdpmc(idx) - counter_start;
-		let elapsed = sample::stop_timer() - start;
+		let elapsed = end - start;
 
 		let average_cycles = elapsed as u32 / ITERATIONS as u32;
 		// let cpu_frequency = sample::get_cpu_frequency();
+
+
+		// let mut kernel_ip = 0;
+		// for event in &mut self.sampling_pc {
+		// 	if let Event::Sample(ref record) = event {
+		// 		let time = record.time - self.time_zero;
+		// 		let quot = time / self.time_mult as u64;
+		// 		let rem = time % self.time_mult as u64;
+		// 		let timestamp = (quot << self.time_shift) + (rem << self.time_shift) / self.time_mult as u64;
+
+		// 		if timestamp >= start && timestamp < end {
+		// 			kernel_ip = record.ip;
+		// 		}
+		// 	}
+		// }
 
 		Datapoint {
 			average_cycles,
 			uops_retired: counter_elapsed as u32,
 			counter: counter2_elapsed as u32,
+			// kernel_ip,
 		}
 	}
 }
