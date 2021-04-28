@@ -138,9 +138,9 @@ impl Experiment {
 		let pc_header2 = unsafe { mem::transmute::<*mut u8, &mut MMAPPage>(self.mmap2.data()) };
 		let idx2 = pc_header2.index - 1;
 
+		let start = sample::start_timer();
 		let counter_start = sample::rdpmc(idx);
 		let counter2_start = sample::rdpmc(idx2);
-		let start = sample::start_timer();
 
 		for _ in 0..ITERATIONS {
 			unsafe {
@@ -162,9 +162,9 @@ __x86_indirect_thunk_r11:
 			// std::hint::black_box(f64::sqrt(std::hint::black_box(12345.0)));
 		}
 
-		let end = sample::stop_timer();
 		let counter2_elapsed = sample::rdpmc(idx2) - counter2_start;
 		let counter_elapsed = sample::rdpmc(idx) - counter_start;
+		let end = sample::stop_timer();
 		let elapsed = end - start;
 
 		let average_cycles = elapsed as u32 / ITERATIONS as u32;

@@ -25,7 +25,7 @@ class Trace:
                 else:
                     i = 1
 
-                if n < 10000:
+                if False and n < 10000:
                     n += 1
                     continue
 
@@ -45,15 +45,19 @@ for file in sys.argv[1:]:
 
 fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True, figsize=(16 * .8, 9 * .4))
 for i in range(2):
-    axs[i].hist(traces[i].times[0], bins=35, range=(50, 120), label="uops_issued < 600")
+    axs[i].hist(traces[i].times[0], bins=125, range=(0, 250), label="uops_issued < 600")
     #axs[i].hist(traces[i].times[1], bins=300, range=(20, 50), label="uops_issued ≥ 600")
-    axs[i].set_xlabel('time (ns)')
+    axs[i].set_xlabel('time (cycles)')
     #axs[i].legend()
 axs[0].set_title("mitigations=auto")
 axs[1].set_title("mitigations=off")
 axs[0].set_ylabel('frequency')
-plt.yscale('log', nonposy='clip')
-plt.ylim(2, 10000000)
+
+print(np.median(traces[0].times[0]))
+print(np.median(traces[1].times[0]))
+
+#plt.yscale('log', nonposy='clip')
+#plt.ylim(2, 10000000)
 
 # fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True, figsize=(16 * .8, 9 * .8))
 # axs.scatter(times[0], counter[0], s=0.01)
