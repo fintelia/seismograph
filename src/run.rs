@@ -138,14 +138,19 @@ impl Experiment {
 		let pc_header2 = unsafe { mem::transmute::<*mut u8, &mut MMAPPage>(self.mmap2.data()) };
 		let idx2 = pc_header2.index - 1;
 
-		let start = sample::start_timer();
 		let counter_start = sample::rdpmc(idx);
 		let counter2_start = sample::rdpmc(idx2);
+		let start = sample::start_timer();
 
+		let mut low0: u32 = 0;
+		let mut low1: u32 = 0;
+		let mut high0: u32 = 0;
+		let mut high1: u32 = 0;
 		for _ in 0..ITERATIONS {
 			unsafe {
 				asm!("
 call __x86_indirect_thunk_r11;
+rdtsc
 jmp 5f;
 __x86_indirect_thunk_r11:
 	call 4f;
@@ -154,22 +159,27 @@ __x86_indirect_thunk_r11:
 	jmp 3b;
 .align 16
 4:	mov [rsp], r11;
-	ret;
+rdtsc;
+mov ebx, eax
+mov ecx, edx
+ret;
 5:",
-				in("r11") do_nop);
+				in("r11") do_nop, out("eax") low1, out("edx") high1, out("ebx") low0, out("ecx") high0);
 			}
 			// unsafe { libc::syscall(-1 /*libc::SYS_getpid*/) };
 			// std::hint::black_box(f64::sqrt(std::hint::black_box(12345.0)));
 		}
 
+		let end = sample::stop_timer();
 		let counter2_elapsed = sample::rdpmc(idx2) - counter2_start;
 		let counter_elapsed = sample::rdpmc(idx) - counter_start;
-		let end = sample::stop_timer();
 		let elapsed = end - start;
 
 		let average_cycles = elapsed as u32 / ITERATIONS as u32;
 		// let cpu_frequency = sample::get_cpu_frequency();
 
+
+		let average_cycles = (((high1 as u64) << 32) | low1 as u64) - (((high0 as u64) << 32) | low0 as u64);
 
 		// let mut kernel_ip = 0;
 		// for event in &mut self.sampling_pc {
@@ -186,7 +196,7 @@ __x86_indirect_thunk_r11:
 		// }
 
 		Datapoint {
-			average_cycles,
+			average_cycles: average_cycles as u32,
 			uops_retired: counter_elapsed as u32,
 			counter: counter2_elapsed as u32,
 			// kernel_ip,
