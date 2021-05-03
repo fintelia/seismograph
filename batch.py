@@ -284,7 +284,7 @@ for name, cmd in counters.items():
     uops = [[], []]
     values = [[], []]
     for p in data["data"]:
-        if p["average_cycles"] < 250:
+        if p["average_cycles"] < 350:
             i = 0
         else:
             i = 1

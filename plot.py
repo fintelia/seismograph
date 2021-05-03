@@ -42,7 +42,7 @@ def main():
                 i = 1
 
             classifications.append(i)
-            times[i].append(float(p["average_cycles"])/2.4 + random.random() - 0.5)
+            times[i].append(float(p["average_cycles"])) # + random.random() - 0.5
             uops[i].append(p["uops_retired"])
             counter[i].append(p["counter"])
 
@@ -133,15 +133,17 @@ def main():
     # print(160, stats.percentileofscore(times, 160.01))
 
     print(len(times[0]))
-    print(np.median(times[0]) * 2.4)
+    print(np.median(times[0]))
+
+    bins = int(np.percentile(times[0], 99.9))
 
     fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
-    axs.hist(times[0], bins=500, range=(0, np.percentile(times[0], 99.9)))
+    axs.hist(times[0], bins=bins, range=(0, bins))
     #axs.hist(times[1], bins=500, range=(0, np.percentile(times[0], 99.9)))
-    #plt.yscale('log', nonposy='clip')
+    plt.yscale('log', nonposy='clip')
     #plt.ylim(2, 10000000)
     axs.set_ylabel('frequency')
-    axs.set_xlabel('time (ns)')
+    axs.set_xlabel('time (cycles)')
 
     # fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
     # axs.hist(times, bins=int(np.percentile(times, 99.9)), range=(0, np.percentile(times, 99.9)))
