@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/python3
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -132,15 +132,17 @@ def main():
     # print(80, stats.percentileofscore(times, 80.01))
     # print(160, stats.percentileofscore(times, 160.01))
 
+    # for i in range(int(len(times[0]) / 2000)):
+    #     print(np.median(times[0][i*2000:min(i*2000+2000, len(times[0]))]))
+
     print(len(times[0]))
     print(np.median(times[0]))
 
-    bins = int(np.percentile(times[0], 99.9))
-
+    bins = int(np.percentile(times[0][50000:], 99.9))
     fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
-    axs.hist(times[0], bins=bins, range=(0, bins))
+    axs.hist(times[0][50000:], bins=bins, range=(0, bins))
     #axs.hist(times[1], bins=500, range=(0, np.percentile(times[0], 99.9)))
-    plt.yscale('log', nonposy='clip')
+    #plt.yscale('log', nonposy='clip')
     #plt.ylim(2, 10000000)
     axs.set_ylabel('frequency')
     axs.set_xlabel('time (cycles)')
@@ -158,14 +160,14 @@ def main():
     # axs.set_ylabel('counter')
     # axs.set_xlabel('getpid time (ns)')
 
-    # fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True, figsize=(16 * .8, 9 * .8))
-    # axs.scatter(times[0], counter[0], s=0.01)
-    # axs.scatter(times[1], counter[1], s=0.01)
-    # plt.ylim(np.percentile(counter[0] + counter[1], 0.1) * 0.7, np.percentile(counter[0] + counter[1], 99.9) * 1.3)
-    # #plt.xlim(0, np.percentile(times[0] + times[1], 99.9) * 2.3)
-    # plt.xlim(0, 1000)
-    # axs.set_xlabel('time (ns)')
-    # #axs.set_ylabel('RESOURCE_STALLS.ANY')
+    fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True, figsize=(16 * .8, 9 * .8))
+    axs.scatter(range(len(times[0][50000:])), times[0][50000:], s=0.00001)
+    #.scatter(times[1], counter[1], s=0.01)
+    #plt.ylim(np.percentile(counter[0] + counter[1], 0.1) * 0.7, np.percentile(counter[0] + counter[1], 99.9) * 1.3)
+    plt.ylim(0, np.percentile(times[0][50000:], 99.99) * 1.2)
+    #plt.xlim(0, 1000)
+    axs.set_ylabel('time (cycles)')
+    #axs.set_ylabel('RESOURCE_STALLS.ANY')
 
     # band = np.percentile(counter2, 99.9) / 10
     # print("counter2:", min(counter2), "..", np.percentile(counter2, 99.9))

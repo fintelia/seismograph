@@ -15,7 +15,7 @@ mod sample;
 
 include!(concat!(env!("OUT_DIR"), "/source_hashes.rs"));
 
-const MAX_DATAPOINTS: usize = 500_000;
+const MAX_DATAPOINTS: usize = 5000_000;
 static EXIT: AtomicBool = AtomicBool::new(false);
 
 fn parse_hex(src: &str) -> Result<u8, ParseIntError> {
@@ -130,7 +130,7 @@ fn main() {
     progress.set_draw_delta(1000);
     let mut experiment = run::Experiment::new(&opt);
     while trace.data.len() < MAX_DATAPOINTS && !EXIT.load(Ordering::SeqCst) {
-        trace.data.push(experiment.single_iter());
+        trace.data.push(experiment.single_iter(trace.data.len()));
 
         // if trace.data.len() % 10000 == 0 {
         //     progress.set_position(trace.data.len() as u64);
