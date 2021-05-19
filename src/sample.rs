@@ -11,9 +11,8 @@ pub(crate) fn start_timer() -> u64 {
     let cycles_high: u32;
 
     unsafe {
-        asm!("cpuid; rdtsc",
+        asm!("push rbx; cpuid; rdtsc; pop rbx",
             out("eax") cycles_low,
-            out("ebx") _,
             out("ecx") _,
             out("edx") cycles_high,
         )
@@ -27,11 +26,10 @@ pub(crate) fn stop_timer() -> u64 {
     let cycles_high: u32;
 
     unsafe {
-        asm!("rdtscp; mov {cycles_low:e}, eax; mov {cycles_high:e}, edx; cpuid",
+        asm!("push rbx; rdtscp; mov {cycles_low:e}, eax; mov {cycles_high:e}, edx; cpuid; pop rbx",
             cycles_low = out(reg) cycles_low,
             cycles_high = out(reg) cycles_high,
             out("eax") _,
-            out("ebx") _,
             out("ecx") _,
             out("edx") _,
         )

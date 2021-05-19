@@ -152,19 +152,21 @@ impl Experiment {
 			}
 			else {
 				unsafe {
-					asm!("
-	call __x86_indirect_thunk_r11;
-	jmp 5f;
-	__x86_indirect_thunk_r11:
-		call 4f;
-	3:	pause;
-		lfence;
-		jmp 3b;
-	.align 16
-	4:	mov [rsp], r11;
-	ret;
-	5:",
-					in("r11") do_nop);
+					asm!("lfence; call r11", in("r11") do_nop);
+				
+	// 				asm!("
+	// call __x86_indirect_thunk_r11;
+	// jmp 5f;
+	// __x86_indirect_thunk_r11:
+	// 	call 4f;
+	// 3:	pause;
+	// 	lfence;
+	// 	jmp 3b;
+	// .align 16
+	// 4:	mov [rsp], r11;
+	// ret;
+	// 5:",
+	// 				in("r11") do_nop);
 				}
 			}
 		}

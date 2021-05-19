@@ -11,14 +11,14 @@ anyhow = "1.0.40"
 chrono = { version = "0.4.19", features = ["serde"] }
 ctrlc = "3.1.9"
 hex = "0.4.3"
-indicatif = "0.15.0"
+indicatif = "0.16.0"
 lazy_static = "1.4.0"
 libc = "0.2.94"
 mmap = "0.1.1"
 perfcnt = { git = "https://github.com/fintelia/rust-perfcnt", rev = "73ae8a53b15b16fc10b54b0991ad9c59b8201b10" } #"0.6.0"
-serde = { version = "1.0.125", features = ["derive"] }
+serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
-sha2 = "0.9.3"
+sha2 = "0.9.5"
 structopt = "0.3.21"
 walkdir = "2.3.2"
 x86 = { version = "0.37.0", features = ["performance-counter"] }
@@ -26,6 +26,6 @@ x86 = { version = "0.37.0", features = ["performance-counter"] }
 [build-dependencies]
 hex = "0.4.3"
 walkdir = "2.3.2"
-sha2 = "0.9.3"
-serde = { version = "1.0.125", features = ["derive"] }
+sha2 = "0.9.5"
+serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
